@@ -12,6 +12,8 @@ use section::Section;
 pub struct Document {
     /// The document class.
     pub class: DocumentClass,
+    /// The `Document`'s options.
+    pub options: Option<Vec<String>>,
     /// The `Document`'s preamble.
     pub preamble: Preamble,
     /// The various elements inside this `Document`.
@@ -169,6 +171,7 @@ pub enum DocumentClass {
     /// A partial document comes without header and footer.
     /// It is intended to be included (`include{}`) in some other tex file.
     Part,
+    Scrlttr2,
     Other(String),
 }
 
@@ -184,6 +187,7 @@ impl Display for DocumentClass {
             DocumentClass::Article => write!(f, "article"),
             DocumentClass::Book => write!(f, "book"),
             DocumentClass::Report => write!(f, "report"),
+            DocumentClass::Scrlttr2 => write!(f, "scrlttr2"),
             DocumentClass::Part => write!(f, ""),
             DocumentClass::Other(ref s) => write!(f, "{}", *s),
         }
@@ -191,11 +195,11 @@ impl Display for DocumentClass {
 }
 
 impl Extend<Element> for Document {
-    fn extend<T: IntoIterator<Item=Element>>(&mut self, iter:T) {
-    for elem in iter {
-      self.push(elem);
+    fn extend<T: IntoIterator<Item = Element>>(&mut self, iter: T) {
+        for elem in iter {
+            self.push(elem);
+        }
     }
-  }
 }
 
 /// An element of the document's preamble.
@@ -212,7 +216,7 @@ pub enum PreambleElement {
         name: String,
         args_num: Option<usize>,
         default_arg: Option<String>,
-        definition: String
+        definition: String,
     },
     /// An escape hatch for including an arbitrary bit of TeX in a preamble.
     UserDefined(String),
@@ -251,23 +255,16 @@ impl Preamble {
     }
 
     /// Interface of most commonly used way to write a `/newcommand` line in latex.  
-    /// If you want to create `/newcommand` in 
-    /// other ways(like add default argument or do not assign the num of arguments), 
-    /// please use `push` method in `Preamble` struct. 
-    pub fn new_command(
-        &mut self,
-        name: &str,
-        args_num: usize,
-        definition: &str
-    ) -> &mut Self {
-        self.contents.push(
-            PreambleElement::NewCommand {
-                name: String::from(name),
-                args_num: Some(args_num),
-                default_arg: None,
-                definition: String::from(definition)
-            }
-        );
+    /// If you want to create `/newcommand` in
+    /// other ways(like add default argument or do not assign the num of arguments),
+    /// please use `push` method in `Preamble` struct.
+    pub fn new_command(&mut self, name: &str, args_num: usize, definition: &str) -> &mut Self {
+        self.contents.push(PreambleElement::NewCommand {
+            name: String::from(name),
+            args_num: Some(args_num),
+            default_arg: None,
+            definition: String::from(definition),
+        });
         self
     }
 
@@ -293,13 +290,12 @@ impl Preamble {
         self.contents.push(element.into());
         self
     }
-
 }
 
 impl Extend<PreambleElement> for Preamble {
-    fn extend<T: IntoIterator<Item=PreambleElement>>(&mut self, iter:T) {
-    for elem in iter {
-      self.push(elem);
+    fn extend<T: IntoIterator<Item = PreambleElement>>(&mut self, iter: T) {
+        for elem in iter {
+            self.push(elem);
+        }
     }
-  }
 }
