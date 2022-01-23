@@ -1,6 +1,6 @@
 use std::slice::Iter;
 
-use document::Element;
+use crate::Element;
 
 /// A document Section.
 ///

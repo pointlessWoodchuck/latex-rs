@@ -1,12 +1,13 @@
 use std::io::Write;
 
 use super::Visitor;
-use document::{Document, DocumentClass, Element, Preamble, PreambleElement};
-use equations::{Align, Equation};
+use crate::Section;
+use crate::{Align, Equation};
+use crate::{Document, DocumentClass, Element, Preamble, PreambleElement};
+use crate::{Item, List};
+use crate::{Paragraph, ParagraphElement};
+use crate::{Row, Table, TableKind};
 use failure::Error;
-use lists::{Item, List};
-use paragraph::{Paragraph, ParagraphElement};
-use section::Section;
 
 /// Print a document to a string.
 pub fn print(doc: &Document) -> Result<String, Error> {
@@ -109,7 +110,7 @@ where
                     name,
                     args_num,
                     default_arg,
-                    definition
+                    definition,
                 } => {
                     write!(self.writer, r"\newcommand{{\{}}}", name)?;
                     if let Some(num) = args_num {
@@ -121,7 +122,7 @@ where
                     writeln!(self.writer, r"{{")?;
                     writeln!(self.writer, "{}", definition)?;
                     writeln!(self.writer, r"}}")?;
-                },
+                }
                 PreambleElement::UserDefined(s) => writeln!(self.writer, r"{}", s)?,
             }
         }
@@ -137,6 +138,44 @@ where
             writeln!(self.writer, r"\author{{{}}}", author)?;
         }
 
+        Ok(())
+    }
+
+    fn visit_table(&mut self, table: &Table) -> Result<(), Error> {
+        let env = table.kind.environment_name();
+        //todo: there must be a better way...
+        match table.kind {
+            TableKind::Tabularx => {
+                writeln!(
+                    self.writer,
+                    r"\begin{{{}}}{{\{}}}{{{}}}",
+                    env, table.table_width, table.column_types
+                )?;
+                for row in table.rows.iter() {
+                    self.visit_table_row(row)?
+                }
+                writeln!(self.writer, r"\end{{{}}}", env)?;
+            }
+            // self.writer
+            ,
+            TableKind::Tabular => {
+                writeln!(self.writer, r"\begin{{{}}}{{{}}}", env, table.column_types)?
+            }
+            TableKind::LongTable => {
+                writeln!(self.writer, r"\begin{{{}}}{{{}}}", env, table.column_types)?
+            }
+            TableKind::XLTabular => writeln!(
+                self.writer,
+                r"\begin{{{}}}{{\{}}}{{{}}}",
+                env, table.table_width, table.column_types
+            )?,
+        };
+
+        Ok(())
+    }
+
+    fn visit_table_row(&mut self, row: &Row) -> Result<(), Error> {
+        writeln!(self.writer, r"{}", row)?;
         Ok(())
     }
 
@@ -177,6 +216,7 @@ where
                 writeln!(self.writer, r"\end{{{}}}", name)?;
             }
             Element::List(ref list) => self.visit_list(list)?,
+            Element::Table(ref table) => self.visit_table(table)?,
             Element::Input(ref s) => writeln!(self.writer, "\\input{{{}}}", s)?,
 
             Element::_Other => unreachable!(),
@@ -232,9 +272,10 @@ where
 
 #[cfg(test)]
 mod tests {
+
     use self::ParagraphElement::*;
     use super::*;
-    use {Align, DocumentClass, Equation, ListKind, Paragraph, Section};
+    use {crate::ListKind, Align, DocumentClass, Equation, Paragraph, Section, TableKind};
 
     #[test]
     fn create_simple_paragraph() {
@@ -354,7 +395,6 @@ mod tests {
         let mut buffer = Vec::new();
         let mut preamble = Preamble::default();
         preamble.new_command("Love", 2, "#1 loves #2");
-        
         {
             let mut printer = Printer::new(&mut buffer);
             printer.visit_preamble(&preamble).unwrap();
@@ -371,15 +411,12 @@ mod tests {
 "#;
         let mut buffer = Vec::new();
         let mut preamble = Preamble::default();
-        preamble.push(
-            PreambleElement::NewCommand {
-                name: String::from("Love"),
-                args_num: Some(3),
-                default_arg: Some(String::from("likes")),
-                definition: String::from("#2 #1 #3")
-            }
-        );
-        
+        preamble.push(PreambleElement::NewCommand {
+            name: String::from("Love"),
+            args_num: Some(3),
+            default_arg: Some(String::from("likes")),
+            definition: String::from("#2 #1 #3"),
+        });
         {
             let mut printer = Printer::new(&mut buffer);
             printer.visit_preamble(&preamble).unwrap();
@@ -605,6 +642,67 @@ y &= m x + c \\
             let mut printer = Printer::new(&mut buffer);
             printer.visit_element(&input).unwrap()
         }
+        assert_eq!(String::from_utf8(buffer).unwrap(), should_be);
+    }
+
+    #[test]
+    fn render_empty_tabularx() {
+        let should_be = "\\begin{tabularx}{\\textwidth}{llXrr}\n";
+        let mut buffer = Vec::new();
+        let table = Table::new(
+            TableKind::Tabularx,
+            String::from("textwidth"),
+            String::from("llXrr"),
+        );
+        {
+            let mut printer = Printer::new(&mut buffer);
+            printer.visit_table(&table).unwrap()
+        }
+        assert_eq!(String::from_utf8(buffer).unwrap(), should_be);
+    }
+
+    #[test]
+    fn render_empty_tabular() {
+        let should_be = "\\begin{tabular}{llXrr}\n";
+        let mut buffer = Vec::new();
+        let table = Table::new(
+            TableKind::Tabular,
+            String::from("textwidth"),
+            String::from("llXrr"),
+        );
+        {
+            let mut printer = Printer::new(&mut buffer);
+            printer.visit_table(&table).unwrap()
+        }
+        assert_eq!(String::from_utf8(buffer).unwrap(), should_be);
+    }
+
+    #[test]
+    fn render_simple_tabularx() {
+        let should_be =
+            "\\begin{tabularx}{\\textwidth}{llXrr}\nrow 1 & row 2 & row 3 & row 4 & row 5 \\\\\n\\end{tabularx}\n";
+        let mut buffer = Vec::new();
+
+        let mut table = Table::new(
+            TableKind::Tabularx,
+            String::from("textwidth"),
+            String::from("llXrr"),
+        );
+
+        let mut row = Row::new();
+        row.push_cell("row 1".to_string());
+        row.push_cell("row 2".to_string());
+        row.push_cell("row 3".to_string());
+        row.push_cell("row 4".to_string());
+        row.push_cell("row 5".to_string());
+
+        table.push_row(row).unwrap();
+
+        {
+            let mut printer = Printer::new(&mut buffer);
+            printer.visit_table(&table).unwrap()
+        }
+
         assert_eq!(String::from_utf8(buffer).unwrap(), should_be);
     }
 }

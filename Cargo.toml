@@ -10,6 +10,8 @@ homepage = "https://github.com/Michael-F-Bryan/latex-rs"
 repository = "https://github.com/Michael-F-Bryan/latex-rs"
 documentation = "https://docs.rs/latex"
 categories = ["template-engine", "text-processing"]
+edition = "2021"
 
 [dependencies]
 failure = "0.1.5"
+thiserror = "1.0.30"

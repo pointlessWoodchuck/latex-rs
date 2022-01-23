@@ -2,10 +2,11 @@ use std::fmt::{self, Display, Formatter};
 use std::ops::Deref;
 use std::slice::Iter;
 
-use equations::Align;
-use lists::List;
-use paragraph::Paragraph;
-use section::Section;
+use crate::Align;
+use crate::List;
+use crate::Paragraph;
+use crate::Section;
+use crate::Table;
 
 /// The root Document node.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -103,6 +104,8 @@ pub enum Element {
     UserDefined(String),
     /// A list.
     List(List),
+    /// A table.
+    Table(Table),
     /// A generic include statement
     Input(String),
 
@@ -127,6 +130,12 @@ impl<'a> From<&'a str> for Element {
 impl From<List> for Element {
     fn from(other: List) -> Self {
         Element::List(other)
+    }
+}
+
+impl From<Table> for Element {
+    fn from(other: Table) -> Self {
+        Element::Table(other)
     }
 }
 
@@ -191,11 +200,11 @@ impl Display for DocumentClass {
 }
 
 impl Extend<Element> for Document {
-    fn extend<T: IntoIterator<Item=Element>>(&mut self, iter:T) {
-    for elem in iter {
-      self.push(elem);
+    fn extend<T: IntoIterator<Item = Element>>(&mut self, iter: T) {
+        for elem in iter {
+            self.push(elem);
+        }
     }
-  }
 }
 
 /// An element of the document's preamble.
@@ -212,7 +221,7 @@ pub enum PreambleElement {
         name: String,
         args_num: Option<usize>,
         default_arg: Option<String>,
-        definition: String
+        definition: String,
     },
     /// An escape hatch for including an arbitrary bit of TeX in a preamble.
     UserDefined(String),
@@ -251,23 +260,16 @@ impl Preamble {
     }
 
     /// Interface of most commonly used way to write a `/newcommand` line in latex.  
-    /// If you want to create `/newcommand` in 
-    /// other ways(like add default argument or do not assign the num of arguments), 
-    /// please use `push` method in `Preamble` struct. 
-    pub fn new_command(
-        &mut self,
-        name: &str,
-        args_num: usize,
-        definition: &str
-    ) -> &mut Self {
-        self.contents.push(
-            PreambleElement::NewCommand {
-                name: String::from(name),
-                args_num: Some(args_num),
-                default_arg: None,
-                definition: String::from(definition)
-            }
-        );
+    /// If you want to create `/newcommand` in
+    /// other ways(like add default argument or do not assign the num of arguments),
+    /// please use `push` method in `Preamble` struct.
+    pub fn new_command(&mut self, name: &str, args_num: usize, definition: &str) -> &mut Self {
+        self.contents.push(PreambleElement::NewCommand {
+            name: String::from(name),
+            args_num: Some(args_num),
+            default_arg: None,
+            definition: String::from(definition),
+        });
         self
     }
 
@@ -293,13 +295,12 @@ impl Preamble {
         self.contents.push(element.into());
         self
     }
-
 }
 
 impl Extend<PreambleElement> for Preamble {
-    fn extend<T: IntoIterator<Item=PreambleElement>>(&mut self, iter:T) {
-    for elem in iter {
-      self.push(elem);
+    fn extend<T: IntoIterator<Item = PreambleElement>>(&mut self, iter: T) {
+        for elem in iter {
+            self.push(elem);
+        }
     }
-  }
 }

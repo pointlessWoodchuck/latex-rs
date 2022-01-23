@@ -4,12 +4,13 @@ mod printer;
 
 pub use self::printer::{print, Printer};
 
-use document::{Document, DocumentClass, Element, Preamble};
-use equations::{Align, Equation};
+use crate::Section;
+use crate::{Align, Equation};
+use crate::{Document, DocumentClass, Element, Preamble};
+use crate::{Item, List};
+use crate::{Paragraph, ParagraphElement};
+use crate::{Row, Table};
 use failure::Error;
-use lists::{Item, List};
-use paragraph::{Paragraph, ParagraphElement};
-use section::Section;
 use std::ops::Deref;
 
 /// A trait which uses the [Visitor Pattern] to recursively visit each node in
@@ -107,6 +108,17 @@ pub trait Visitor {
 
     /// Visit a single `Equation`.
     fn visit_equation(&mut self, equation: &Equation) -> Result<(), Error> {
+        Ok(())
+    }
+
+    /// Visit a `Table`and all of its rows
+    // TODO: Rows
+    fn visit_table(&mut self, table: &Table) -> Result<(), Error> {
+        Ok(())
+    }
+
+    /// Visit a Table row
+    fn visit_table_row(&mut self, row: &Row) -> Result<(), Error> {
         Ok(())
     }
 
